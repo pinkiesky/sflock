@@ -1,8 +1,5 @@
 /* See LICENSE file for license details. */
 #define _XOPEN_SOURCE 500
-#if HAVE_SHADOW_H
-#include <shadow.h>
-#endif
 
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -12,7 +9,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/vt.h>
-#include <pwd.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,10 +18,6 @@
 #include <termios.h>
 #include <unistd.h>
 
-#if HAVE_BSD_AUTH
-#include <bsd_auth.h>
-#include <login_cap.h>
-#endif
 
 static void die(const char *errstr, ...) {
   va_list ap;
@@ -36,41 +28,11 @@ static void die(const char *errstr, ...) {
   exit(EXIT_FAILURE);
 }
 
-#ifndef HAVE_BSD_AUTH
-static const char *get_password() { /* only run as root */
-  const char *rval;
-  struct passwd *pw;
-
-  if (geteuid() != 0)
-    die("sflock: cannot retrieve password entry (make sure to suid sflock)\n");
-  pw = getpwuid(getuid());
-  endpwent();
-  rval = pw->pw_passwd;
-
-#if HAVE_SHADOW_H
-  {
-    struct spwd *sp;
-    sp = getspnam(getenv("USER"));
-    endspent();
-    rval = sp->sp_pwdp;
-  }
-#endif
-
-  /* drop privileges temporarily */
-  if (setreuid(0, pw->pw_uid) == -1)
-    die("sflock: cannot drop privileges\n");
-  return rval;
-}
-#endif
-
 int main(int argc, char **argv) {
   char curs[] = {0, 0, 0, 0, 0, 0, 0, 0};
   char buf[32], passwd[256], passdisp[256];
-  int num, screen, width, height, update, sleepmode, term, pid;
+  int num, screen, width, height, update, sleepmode, pid;
 
-#ifndef HAVE_BSD_AUTH
-  const char *pws;
-#endif
   unsigned int len;
   Bool running = True;
   Cursor invisible;
@@ -88,7 +50,7 @@ int main(int argc, char **argv) {
   // defaults
   char *passchar = "*";
   char *fontname = "-*-dejavu sans-bold-r-*-*-*-420-100-100-*-*-iso8859-1";
-  char *username = "";
+  char *username = "... HOTP ...";
   int showline = 1;
   int xshift = 0;
 
@@ -121,28 +83,12 @@ int main(int argc, char **argv) {
     for (int j = 0; j < strlen(passchar) && i + j < sizeof passdisp; j++)
       passdisp[i + j] = passchar[j];
 
-  /* disable tty switching */
-  if ((term = open("/dev/console", O_RDWR)) == -1) {
-    perror("error opening console");
-  }
-
-  if ((ioctl(term, VT_LOCKSWITCH)) == -1) {
-    perror("error locking console");
-  }
-
   /* deamonize */
   pid = fork();
   if (pid < 0)
     die("Could not fork sflock.");
   if (pid > 0)
     exit(0); // exit parent
-
-#ifndef HAVE_BSD_AUTH
-  pws = get_password();
-  username = getpwuid(geteuid())->pw_name;
-#else
-  username = getlogin();
-#endif
 
   if (!(dpy = XOpenDisplay(0)))
     die("sflock: cannot open dpy\n");
@@ -252,11 +198,8 @@ int main(int argc, char **argv) {
       switch (ksym) {
       case XK_Return:
         passwd[len] = 0;
-#ifdef HAVE_BSD_AUTH
-        running = !auth_userokay(getlogin(), NULL, "auth-xlock", passwd);
-#else
-        running = strcmp(crypt(passwd, pws), pws);
-#endif
+        running = 0;
+
         if (running != 0)
           // change background on wrong password
           XSetWindowBackground(dpy, w, red.pixel);
@@ -286,15 +229,6 @@ int main(int argc, char **argv) {
       update = True; // show changes
     }
   }
-
-  /* free and unlock */
-  setreuid(geteuid(), 0);
-  if ((ioctl(term, VT_UNLOCKSWITCH)) == -1) {
-    perror("error unlocking console");
-  }
-
-  close(term);
-  setuid(getuid()); // drop rights permanently
 
   XUngrabPointer(dpy, CurrentTime);
   XFreePixmap(dpy, pmap);
