@@ -6,9 +6,14 @@
 //   struct HotpData data;
 
 //   hotpLoadDataPath("./hotpSettings", &data);
-//   hotpInitRuntime(&runtime, &data);
+//   int res = hotpInitRuntime(&runtime, &data);
+//   if (res < 0) {
+//     printf("[err] cannot init hmac runtime\n");
+//     return 1;
+//   }
 
 //   hotpCalculate(&runtime, &data);
+//   printf("Token: %s\n", runtime.value);
 
 //   return 0;
 // }
@@ -31,13 +36,19 @@ struct HotpRuntime {
 };
 
 int hotpLoadDataFile(FILE *fp, struct HotpData *hotp) {
-  fscanf(fp, "%s\n%u\n%u\n%s", hotp->secret, &hotp->timeWindowSec, &hotp->tokenSize, hotp->digestName);
+  return fscanf(fp, "%s\n%u\n%u\n%s", hotp->secret, &hotp->timeWindowSec, &hotp->tokenSize, hotp->digestName);
 }
 
 int hotpLoadDataPath(char *path, struct HotpData *hotp) {
   FILE *fp = fopen(path, "r");
+  if (fp == NULL) {
+    return -1;
+  }
+
   hotpLoadDataFile(fp, hotp);
   fclose(fp);
+
+  return 0;
 }
 
 int hotpInitRuntime(struct HotpRuntime *runtime, struct HotpData *data) {
@@ -47,6 +58,9 @@ int hotpInitRuntime(struct HotpRuntime *runtime, struct HotpData *data) {
   }
 
   runtime->mdctx = EVP_MD_CTX_new();
+  if (runtime->mdctx == NULL) {
+    return -1;
+  }
 
   return 0;
 }
@@ -64,9 +78,10 @@ int hotpCalculate(struct HotpRuntime *runtime, struct HotpData *hotp) {
   EVP_DigestUpdate(runtime->mdctx, hotp->secret, strlen(hotp->secret));
   EVP_DigestFinal(runtime->mdctx, runtime->md_value, &runtime->md_len);
 
-  int i;
+  unsigned int i;
+  unsigned int step = runtime->md_len / hotp->tokenSize;
   for (i = 0; i < hotp->tokenSize; i++) {
-    runtime->value[i] = (runtime->md_value[i] % 10) + '0';
+    runtime->value[i] = (runtime->md_value[i * step] % 10) + '0';
   }
   runtime->value[i + 1] = '\0';
 
