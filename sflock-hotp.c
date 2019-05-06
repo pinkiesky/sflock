@@ -220,7 +220,7 @@ int main(int argc, char **argv) {
         hotpCalculate(&runtime, &data);
         int eq = strncmp(runtime.value, passwd, len);
         
-        if (eq == 0) {
+        if (eq == 0 && len > 0) {
           running = 0;
         }
 

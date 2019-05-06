@@ -5,7 +5,7 @@
 
 include config.mk
 
-SRC = sflock.c
+SRC = sflock-hotp.c
 OBJ = ${SRC:.c=.o}
 
 all: options sflock
@@ -22,7 +22,7 @@ options:
 
 ${OBJ}: config.mk
 
-sflock: ${OBJ}
+sflock-hotp: ${OBJ}
 	@echo CC -o $@
 	@${CC} -o $@ ${OBJ} ${LDFLAGS}
 
