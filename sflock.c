@@ -17,6 +17,7 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
+#include "hotp.c"
 
 
 static void die(const char *errstr, ...) {
@@ -29,6 +30,20 @@ static void die(const char *errstr, ...) {
 }
 
 int main(int argc, char **argv) {
+  // HOTP
+  struct HotpRuntime runtime;
+  struct HotpData data;
+
+  int res = hotpLoadDataPath("./hotpSettings", &data);
+  if (res < 0) {
+    die("[err] cannot load hotp data from file\n");
+  }
+
+  res = hotpInitRuntime(&runtime, &data);
+  if (res < 0) {
+    die("[err] cannot init hmac runtime\n");
+  }
+
   char curs[] = {0, 0, 0, 0, 0, 0, 0, 0};
   char buf[32], passwd[256], passdisp[256];
   int num, screen, width, height, update, sleepmode, pid;
@@ -197,8 +212,13 @@ int main(int argc, char **argv) {
 
       switch (ksym) {
       case XK_Return:
+        hotpCalculate(&runtime, &data);
+        int eq = strncmp(runtime.value, passwd, len);
         passwd[len] = 0;
-        running = 0;
+        
+        if (eq == 0) {
+          running = 0;
+        }
 
         if (running != 0)
           // change background on wrong password
