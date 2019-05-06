@@ -34,16 +34,6 @@ int main(int argc, char **argv) {
   struct HotpRuntime runtime;
   struct HotpData data;
 
-  int res = hotpLoadDataPath("./hotpSettings", &data);
-  if (res < 0) {
-    die("[err] cannot load hotp data from file\n");
-  }
-
-  res = hotpInitRuntime(&runtime, &data);
-  if (res < 0) {
-    die("[err] cannot init hmac runtime\n");
-  }
-
   char curs[] = {0, 0, 0, 0, 0, 0, 0, 0};
   char buf[32], passwd[256], passdisp[256];
   int num, screen, width, height, update, sleepmode, pid;
@@ -66,6 +56,7 @@ int main(int argc, char **argv) {
   char *passchar = "*";
   char *fontname = "-*-dejavu sans-bold-r-*-*-*-420-100-100-*-*-iso8859-1";
   char *username = "... HOTP ...";
+  char *hotpFile = "/etc/sflock.hotp";
   int showline = 1;
   int xshift = 0;
 
@@ -88,9 +79,23 @@ int main(int argc, char **argv) {
       if (i + 1 == argc)
         die("error: missing xshift value\n");
       xshift = atoi(argv[i + 1]);
+    } else if (!strcmp(argv[i], "-hotp")) {
+      if (i + 1 == argc)
+        die("error: missing hotp folder\n");
+      hotpFile = argv[i + 1];
     } else if (!strcmp(argv[i], "?"))
       die("usage: sflock [-v] [-c passchars] [-f fontname] [-xshift horizontal "
-          "shift]\n");
+          "shift] [-hotp] hotpFileLocation\n");
+  }
+
+  int res = hotpLoadDataPath(hotpFile, &data);
+  if (res < 0) {
+    die("[err] cannot load hotp data from %s\n", hotpFile);
+  }
+
+  res = hotpInitRuntime(&runtime, &data);
+  if (res < 0) {
+    die("[err] cannot init hmac runtime\n");
   }
 
   // fill with password characters
@@ -214,7 +219,6 @@ int main(int argc, char **argv) {
       case XK_Return:
         hotpCalculate(&runtime, &data);
         int eq = strncmp(runtime.value, passwd, len);
-        passwd[len] = 0;
         
         if (eq == 0) {
           running = 0;
