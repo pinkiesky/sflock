@@ -5,8 +5,13 @@
 //   struct HotpRuntime runtime;
 //   struct HotpData data;
 
-//   hotpLoadDataPath("./hotpSettings", &data);
-//   int res = hotpInitRuntime(&runtime, &data);
+//   int res = hotpLoadDataPath("/home/rglr/.config/sflock.hotp", &data);
+//   if (res < 0) {
+//     printf("[err] cannot load hotp data from %s\n", "/home/rglr/.config/sflock.hotp");
+//     return 1;
+//   }
+
+//   res = hotpInitRuntime(&runtime, &data);
 //   if (res < 0) {
 //     printf("[err] cannot init hmac runtime\n");
 //     return 1;
