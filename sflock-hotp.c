@@ -218,9 +218,7 @@ int main(int argc, char **argv) {
       switch (ksym) {
       case XK_Return:
         hotpCalculate(&runtime, &data);
-        int eq = strncmp(runtime.value, passwd, len);
-        
-        if (eq == 0 && len > 0) {
+        if (len == data.tokenSize && !strncmp(runtime.value, passwd, len)) {
           running = 0;
         }
 
